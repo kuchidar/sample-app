@@ -50,8 +50,13 @@ def create_user():
 
 @app.route("/users/<user_id>", methods=["GET"])
 def get_user(user_id):
+    try:
+        user_id = int(user_id)
+    except ValueError:
+        return jsonify({"error": "Invalid user ID"}), 400
+    
     conn = get_db()
-    user = conn.execute(f"SELECT * FROM users WHERE id = {user_id}").fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
     if user:
         return jsonify(dict(user))
@@ -60,11 +65,24 @@ def get_user(user_id):
 
 @app.route("/users/<user_id>", methods=["PUT"])
 def update_user(user_id):
+    try:
+        user_id = int(user_id)
+    except ValueError:
+        return jsonify({"error": "Invalid user ID"}), 400
+    
     data = request.json
+    if not data or 'name' not in data or 'email' not in data:
+        return jsonify({"error": "name and email are required"}), 400
+    
     conn = get_db()
-    conn.execute(
-        f"UPDATE users SET name='{data['name']}', email='{data['email']}' WHERE id = {user_id}"
+    cursor = conn.execute(
+        "UPDATE users SET name=?, email=? WHERE id = ?",
+        (data['name'], data['email'], user_id)
     )
+    if cursor.rowcount == 0:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    
     conn.commit()
     conn.close()
     return jsonify({"status": "updated"})
@@ -72,8 +90,13 @@ def update_user(user_id):
 
 @app.route("/users/<user_id>", methods=["DELETE"])
 def delete_user(user_id):
+    try:
+        user_id = int(user_id)
+    except ValueError:
+        return jsonify({"error": "Invalid user ID"}), 400
+    
     conn = get_db()
-    conn.execute(f"DELETE FROM users WHERE id = {user_id}")
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     conn.close()
     return jsonify({"status": "deleted"})
@@ -84,7 +107,8 @@ def search_users():
     query = request.args.get("q", "")
     conn = get_db()
     users = conn.execute(
-        f"SELECT * FROM users WHERE name LIKE '%{query}%' OR email LIKE '%{query}%'"
+        "SELECT id, name, email FROM users WHERE name LIKE ? OR email LIKE ?",
+        (f'%{query}%', f'%{query}%')
     ).fetchall()
     conn.close()
     return jsonify([dict(u) for u in users])
