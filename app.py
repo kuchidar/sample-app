@@ -58,6 +58,18 @@ def get_user(user_id):
     return jsonify({"error": "not found"}), 404
 
 
+@app.route("/users/<user_id>", methods=["PUT"])
+def update_user(user_id):
+    data = request.json
+    conn = get_db()
+    conn.execute(
+        f"UPDATE users SET name='{data['name']}', email='{data['email']}' WHERE id = {user_id}"
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "updated"})
+
+
 @app.route("/users/<user_id>", methods=["DELETE"])
 def delete_user(user_id):
     conn = get_db()
@@ -65,6 +77,17 @@ def delete_user(user_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "deleted"})
+
+
+@app.route("/users/search", methods=["GET"])
+def search_users():
+    query = request.args.get("q", "")
+    conn = get_db()
+    users = conn.execute(
+        f"SELECT * FROM users WHERE name LIKE '%{query}%' OR email LIKE '%{query}%'"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(u) for u in users])
 
 
 @app.route("/admin/export", methods=["GET"])
